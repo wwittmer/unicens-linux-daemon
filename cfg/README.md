@@ -110,7 +110,7 @@ Note the total network bandwidth limit for both network speed grades:
 This means for the example above, that the remaining bandwidth for audio/ video streaming on an INICnet technology 50utp network is 36 bytes (116 bytes - 80 bytes).
 
 Setting the _AsyncBandwidth_ to 0 is allowed. In this case no Ethernet communication is possible, and all bandwidth is available for audio and video streaming.
-Setting  the _AsyncBandwidth_ to the maximum possible value (here 116 bytes) is allowed. In this case the Ethernet channel is running with the full speed, but no streaming is possible.
+Setting  the _AsyncBandwidth_ to the maximum possible value (here 116 bytes) is allowed. In this case the asynchronous channel is running with the full speed, but no streaming is possible.
 
 Beside of using the asynchronous channel, there are dedicated streaming channels to transport audio and video data.
 They also use the same metric "bytes within 48 kHz" as their bandwidth configuration.
@@ -137,7 +137,7 @@ There are three categories a node can belong to:
 
  1. **Root Node** - It runs the central UNICENS stack. There can only be one device in the network with this role.
  2. **Slim Node** - Without any CPU on it, such as a microphone or booster. It is completely remote controlled. Any GPIO or I2C peripheral can be remotely triggered from the Root Node via the network.
- 3. **Smart Node** - With a CPU or micro-controller. It is also completely remote controlled and has GPIO and I2C remote access like the Slim Node. But there are two additional ways to communicate (peer to peer): via the control channel and the Ethernet channel.
+ 3. **Smart Node** - With a CPU or micro-controller. It is also completely remote controlled and has GPIO and I2C remote access like the Slim Node. But there are two additional ways to communicate (peer to peer): via the control channel and the asynchronous channel.
 
 Slim Nodes and Smart Nodes may be instanced multiple times in the network.
 The theoretical limit of nodes per network is 64. Due to power- and timing reasons, the actual value can be lower than that.
@@ -183,7 +183,7 @@ For example, specifying two devices in the network: UNICENS Master Node and a sm
 ```
 With this example, the mentioned devices are allowed to join the network.
 As there is no additional information given, the devices can communicate via the Control
-and Ethernet channel, but there are no dedicated channels for audio or video transmission.
+and asynchronous channel, but there are no dedicated channels for audio or video transmission.
 
 **4.)  Connections**
 
@@ -305,7 +305,7 @@ The following two attributes are mandatory to define a valid USB socket:
 	 - Endpoint 0x00 is reserved for administrative purposes.
 	 - For streaming data, currently a maximum of 5 endpoints is supported. Hence, USB endpoint addresses in the rage of 0x01 ... 0x05 (EHC TX) and 0x81 ... 0x85 (EHC RX) may be used.
 	 - Control data is transmitted on endpoints for OS81118/9: 0x0F & 0x8F; for OS81210: 0x07 & 0x87 (must not be used inside SyncConnection or AVPConnection)
- 	 - Asynchronous Ethernet data is transmitted on endpoints for OS81118/9: 0x0E & 0x8E; for OS81210: 0x06 & 0x86 (must not be used inside SyncConnection or AVPConnection)
+ 	 - Asynchronous data - e.g. Ethernet packets -  is transmitted on endpoints for OS81118/9: 0x0E & 0x8E; for OS81210: 0x06 & 0x86 (must not be used inside SyncConnection or AVPConnection)
 - FramesPerTransaction="..."
 	- A micro frame on USB is a chunk of 512 bytes. This is the maximum transmission unit (MTU) for the used bulk transfer mode on USB. In order to get a very efficient streaming behavior, the INIC always fills a micro frame completely, so there is no additional signaling needed. Depending on the use case, waiting for 512 bytes of data (for example audio data) to arrive and then start the transmission after that can cause a measurable latency. For some use-cases this latency is unwanted (e.g. noise cancellation).
 	- To achieve low latency, the integrator can choose to not fill the micro frame entirely with data. This means that the transmission is started earlier, with less than 512 bytes of valid streaming data. The software driver (for EHC TX) or the INIC hardware (for EHC RX) automatically appends invalid stuffing data to fill the USB micro frame and keep the signaling overhead as less as possible. The invalid stuffing data is never transported on the network, so no bandwidth on the network is wasted.
@@ -315,7 +315,7 @@ The following two attributes are mandatory to define a valid USB socket:
 	- For isochronous sockets, there are only two possibilities: FramesPerTransaction set to 2 - in this case two transport stream packets (2 \* 188/192 bytes) will be stored in one USB micro frame. The second option is to set the FramesPerTransaction value to 0xFF. In this case, the USB micro frame is always completely filled. Since 512 bytes of the micro frame are not dividable by 188/192 bytes, the fractional rest of the streaming data is put into the next micro frame. This means, that on the receiver side the integrator cannot rely any longer on the fact that the first received byte of a micro frame will be the first byte of the transport stream packet. In that case integrator needs to search for 0x47 inside the payload of the stream, which marks the start of a transport stream packet.
 	- In contrast to other sockets, the USB socket bandwidth must not be specified. It automatically adjusts its speed to the corresponding network socket.
 
-**5.2) Defining a MLB<sup>&reg;</sup> Socket**
+**5.2) Defining a MediaLB<sup>&reg;</sup> Socket**
 
 The Media Local Bus (MLB) is a dedicated bus for interfacing the INIC and I/O Companion chips.
 It is adopted by many vendor products, such as Atmel SAM V71, NXP i.MX6, Renesas RCAR H3/M3.
@@ -327,8 +327,8 @@ The following two attributes are mandatory to define a valid MediaLB socket:
 	 - Integer value between 10 ... 64.
 	 - Value must be even.
 	 - Channel address 0 is unused.
-	 - Channel addresses 2 & 4 are reserved for control channel.
-	 - Channel addresses 6 & 8 are reserved for asynchronous Ethernet channel.
+	 - Channel addresses 2 & 4 are reserved for the control channel.
+	 - Channel addresses 6 & 8 are reserved for the asynchronous channel.
  - Bandwidth="..."
 	 - The number of bytes transferred within 48 kHz (See 2.1).
 	 - The MediaLB Port can be configured with different speed rates (See 9.2). Depending on the chosen speed, the bandwidth must be in a certain range:
@@ -497,7 +497,7 @@ A Splitter resides inside a `<SyncConnection>` as second entry, meaning it is an
 	 - This value is then the same as the corresponding Bandwidth attribute of the opposite `<MediaLBSocket>` or `<StreamSocket>` tag.
 	 - This value needs to be considered also in the calculation for the FramesPerTransaction attribute if the opposite socket is a `<USBSocket>`.
 
-The childs of the Splitter are then multiple `<NetworkSocket>` tags with additional mandatory attributes:
+The children of the Splitter are then multiple `<NetworkSocket>` tags with additional mandatory attributes:
  - Offset=".."
 	 - This attribute declares the cutting start position inside of the source TDM stream for that particular `<NetworkSocket>`.
 	 - A value of 0 means that it shall be cut at the beginning of the TDM stream.
@@ -506,9 +506,9 @@ The childs of the Splitter are then multiple `<NetworkSocket>` tags with additio
 	 - This attribute was already marked as mandatory (See 5.4). But in the Splitter context it is also used to define indirectly the cutting end position inside of the combined TDM stream:
 *End = Bandwidth + Offset*
 
-Each `<NetworkSocket>` forms with this information a block inside the TDM stream. The integrator must ensure that the blocks are not overlapping each other.
+Having this information, each `<NetworkSocket>` forms a block inside the TDM stream. The integrator must ensure that the blocks are not overlapping each other.
 
-Here is an example, cutting a 5.1 multi-channel stream from a head unit into three stereo streams using a Splitter. The sinks are three stereo slim amplifiers.
+Here is an example, cutting a 5.1 multi-channel stream from a head unit into three stereo streams using a Splitter. The sinks are three stereo amplifiers.
 
 ```xml
 <?xml version="1.0"?>
@@ -549,7 +549,7 @@ Here is an example, cutting a 5.1 multi-channel stream from a head unit into thr
 
 **7.) Defining an Audio Loopback**
 
-In certain cases, it may be helpful to route the audio from the source back to itself (looping back). This may be the case in which the radio tuner shall not accidental activate the head unit´s wake word (like "Alexa" or "Hey Siri").
+In certain cases, it may be helpful to route the audio from the source back to itself (looping back). This may be the case when the radio tuner shall not accidentally activate the head unit´s wake word (like "Alexa" or "Hey Siri").
 To achieve this, simply add two `<SyncConnection>` to the same Node. Ensure that the Route name of the  `<NetworkSocket>` is the same for both.
 The target peripheral interface (USB, MediaLB, Streaming Port) may be different for both connections.
 
@@ -597,7 +597,7 @@ Unfortunately, it is not possible to use a loopback with connections in which a 
 
 It may be very useful to activate/deactivate certain connections (applies to `<SyncConnection>` and `<AVPConnection>`).
 Reasons to do so are:
-- Save network bandwidth - If all connections together consume more bandwidth as the network can handle, switching off unused streams can free the needed space.
+- Save network bandwidth - If all connections together consume more bandwidth than the network can support, switching off unused streams can free up the needed space.
 - Having multiple sources - Connections can only be established, if there is exactly one source available. However, if a source is switched off, another source may be activated instead.
 - Safely shut down audio connections to avoid plopping sound.
 
@@ -677,7 +677,7 @@ Error cases can be handled by inspecting the callback "UCSI_CB_OnRouteResult".
 
 **9.) Working With Ports**
 
-So far only sockets where used. They also configured the ports of the INIC. But the attributes used there, configured only the specific parameters for that connection. There are more parameters, which are shared for all connections using a port. Those parameters can be stored in port tags in the XML file or saved persistently into the INIC Configuration String (Flash/OTP) memory. Those parameters are mandatory. Not configuring them in the XML or in the Configuration String will lead to a lot of run time errors and may leave the entire setup unusable.
+So far we have only used sockets in the above examples. However, the socket attributes configure parameters for one specific connection only. Parameters which are common for all sockets/connections at a specific port can be set in so-called port tags in the xml file or saved persistently into the INIC Configuration String (Flash/OTP) memory. Those parameters are mandatory. Not configuring them in the XML or in the Configuration String will lead to a lot of run time errors and may leave the entire setup unusable.
 Port tags are defined as a child of a `<Node>` tag.
 
 The following are possible port types:
@@ -759,7 +759,7 @@ Streaming Port can only be frequency locked to the network’s system clock.
 
 **10.) Working with Scripts**
 
-The INIC on a Slim- or a Smart Node can remote control peripherals including audio codecs, camera sensors, INIC I/O companions, port expander, LEDs and Buttons. Therefore, it provides an I2C master interface and GPIO pins, which are controllable via network.
+The INIC on a Slim- or a Smart Node can control its local peripherals including audio codecs, camera sensors, INIC I/O companions, port expander, LEDs and Buttons as a proxy of the Root Node. Therefore, it provides an I2C master interface and GPIO pins, which are controllable via network.
 UNICENS provides the capability to execute a list of jobs when a device connects to the network the first time.
 Those scripts can be assigned for each node in the XML file. Therefore, the `<Node>` tag has an optional attribute called _Script_:
  - Script=".."
@@ -786,7 +786,7 @@ A **non** working example (because of missing parameters) would be:
 ```
 
 In the example above, the node with the address 0x240 references to the Script named "Script_AUX_IO".
-In the next line the Script is getting declared with exact the same name (case- and space sensitive).
+In the next line the Script is getting declared having exactly the same name (case- and space sensitive).
 The jobs will then be declared as children of the `<Script>` tag. UNICENS executes the jobs in the same order as they appear in the XML file.
 
 These are the possible jobs:
@@ -802,7 +802,7 @@ These are the possible jobs:
 
 **10.1) Defining an I2C Port Create Job**
 
-In order to enable the usage of remote I2C, the ports need to be created first with the `<I2CPortCreate>` tag. It has only one mandatory attribute called _Speed_:
+In order to enable the usage of remote I2C in a remote INIC, the ports need to be created first with the `<I2CPortCreate>` tag. It has only one mandatory attribute called _Speed_:
 
  - Speed=".."
 	 - This is an enumeration.
@@ -822,7 +822,7 @@ Example: Create I2C Port with 400 kHz:
 
 In order to use this job, make sure that the I2C Port has been already created by the  `<I2CPortCreate>` tag.
 The tag to create an I2C write job is named `<I2CPortWrite>`.
-With this job, a single- or multiple I2C write command can be sent.
+With this job, a single- or multiple I2C write commands can be sent across the network to a Remote Node.
 If only the two mandatory attributes are given, a single message is sent:
 
 - Address=".."
@@ -996,7 +996,7 @@ void UCSI_CB_OnGpioStateChange(void *pTag, uint16_t inicNetNodeAddress, uint8_t 
 
 **10.5) Defining a GPIO Pin State job**
 
-In order to use this job, make sure that the I2C Port has already been created by the  `<GPIOPortCreate>`.
+In order to use this job, make sure that the GPIO Port has already been created by the  `<GPIOPortCreate>`.
 The tag to be used is named `<GPIOPinState>`.
 The purpose of this function is to set the state of GPIOs configured as output pin. For all other configurations, this function has no influence.
 
@@ -1022,10 +1022,10 @@ In the example above, the GPIO 8 (0x100 == 1 << 8) is set to High state.
 
 **11.) Working with Drivers**
 
-The UNICENS daemon may use the UNICENS XML description to configure the driver on the fly.
+The UNICENS daemon may use the UNICENS XML description to configure the MOST Linux Driver on the fly.
 The helper tool `xml2struct` can generate an offline default configuration out of the UNICENS XML description, which is then used for configuring the driver in a static way. Hence, the driver always comes up with an already working configuration, once the INIC is detected.
 
-Having one configuration for all will automatically keep both UNICENS and the driver domain linked together. Otherwise, if the driver configuration does not align with the INIC configuration (for example FramesPerTransaction (See 5.1)), since the driver was configured manually, awful audio artifacts can come out of the speakers.
+Having one configuration for all will automatically keep both UNICENS and the driver domain linked together. Otherwise, if the driver configuration does not align with the INIC configuration (for example FramesPerTransaction (See 5.1)), since the driver was configured manually, awful audio artifacts can occur.
 
 A driver configuration can be assigned for each connection in the XML file. Therefor the `<SyncConnection>` and the `<AVPConnection>` tag have an optional attribute called _Driver_:
  - Driver=".."
@@ -1061,9 +1061,9 @@ There can be child tags declared inside the Driver tag. They hold the actual inf
 **11.1) Defining a CDEV Driver Instance**
 
 In order to activate the character device driver, the `<Cdev>` tag is used. Once the driver is up and running, it will generate a virtual file in the */dev* folder in the target file system. This virtual file can be opened, read and written as any other file by a tool, such as *cat* or *dd* or in any programming language including C, C++, Java, Python.  However, seeking inside the character device is not supported, as the data is getting streamed and therefore has no random access possibility.
-If the file supports reading or writing, depends on the role of the current connection:
-If it's a source, it supports reading. If it's a sink, it supports writing.
-There is no protocol header involved. The first byte written to the CDEV is the first byte on the network. The same applies for the receive part.
+Whether the file supports reading or writing, depends on the role of the current connection in the INIC:
+If the connection builds a sink (from network point of view), the CDEV supports reading. If the connection builds a source, the CDEV supports writing.
+There is no protocol header involved. The first byte written to the CDEV is the first byte on the network. The same applies for the receiving part.
 
 It has three mandatory attributes:
 
